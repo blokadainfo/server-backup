@@ -1,0 +1,114 @@
+services:
+  # Reverse proxy
+  traefik:
+    image: docker.io/library/traefik:v3.6.6
+    command:
+      - "--accesslog"
+      - "--accesslog.filepath=/var/log/traefik/access.log"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.web.address=:80"
+      - "--entrypoints.web.http.redirections.entrypoint.to=:443"
+      - "--entrypoints.web.http.redirections.entrypoint.scheme=https"
+      # - "--entrypoints.web.http.middlewares=traefik-real-ip@docker"
+      - "--entrypoints.websecure.address=:443"
+      - "--entrypoints.websecure.http3"
+      - "--entrypoints.websecure.http3.advertisedPort=443"
+      # - "--entrypoints.websecure.http.middlewares=traefik-real-ip@docker"
+      - "--certificatesresolvers.letsencrypt.acme.email=${TRAEFIK_ACME_EMAIL}"
+      - "--certificatesresolvers.letsencrypt.acme.storage=acme/acme.json"
+      - "--certificatesresolvers.letsencrypt.acme.dnsChallenge.provider=cloudflare"
+      - "--certificatesresolvers.letsencrypt.acme.dnsChallenge.resolvers=1.1.1.1:53,1.0.0.1:53"
+      # - "--experimental.plugins.traefik-real-ip.modulename=github.com/jramsgz/traefik-real-ip"
+      # - "--experimental.plugins.traefik-real-ip.version=v1.0.7"
+    environment:
+      CF_DNS_API_TOKEN: ${TRAEFIK_CF_API_TOKEN}
+      CF_ZONE_API_TOKEN: ${TRAEFIK_CF_API_TOKEN}
+    volumes:
+      - type: volume
+        source: traefik-logs-vol
+        target: /var/log/traefik
+        volume:
+          nocopy: false
+      - type: volume
+        source: traefik-acme-vol
+        target: /acme
+        volume:
+          nocopy: false
+      - type: bind
+        source: /var/run/docker.sock
+        target: /var/run/docker.sock
+        read_only: true
+    ports:
+      - "127.0.0.1:80:80/tcp" # WARN: Accessible on localhost only (SSH tunnel)
+      - "127.0.0.1:443:443/tcp" # WARN: Accessible on localhost only (SSH tunnel)
+      - "127.0.0.1:443:443/udp" # WARN: Accessible on localhost only (SSH tunnel)
+    networks:
+      traefik-2-internet:
+      traefik-2-minio:
+      cloudflared-2-traefik:
+    restart: unless-stopped
+
+  cloudflared:
+    image: docker.io/cloudflare/cloudflared:2026.7.2
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      TUNNEL_TOKEN: ${CLOUDFLARED_TUNNEL_TOKEN}
+    networks:
+      cloudflared-2-internet:
+      cloudflared-2-traefik:
+    restart: unless-stopped
+
+  # S3 - TODO: Switch to Garage
+  minio:
+    image: docker.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: ["server", "/data", "--console-address", ":9001"]
+    environment:
+      MINIO_BROWSER_REDIRECT_URL: "https://${MINIO_CONSOLE_DOMAIN}"
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+    volumes:
+      - type: bind
+        source: /var/stor/minio/data
+        target: /data
+    networks:
+      - minio-2-internet
+      - traefik-2-minio
+    labels:
+      - "traefik.enable=true"
+      - "traefik.docker.network=${DOCKER_NETWORK_PREFIX}_traefik-2-minio"
+      - "traefik.http.routers.minio.rule=Host(`${MINIO_S3_DOMAIN}`)"
+      - "traefik.http.routers.minio.entrypoints=websecure"
+      - "traefik.http.routers.minio.tls=true"
+      - "traefik.http.routers.minio.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.minio.service=minio"
+      - "traefik.http.services.minio.loadbalancer.server.port=9000"
+      - "traefik.http.routers.minio-console.rule=Host(`${MINIO_CONSOLE_DOMAIN}`)"
+      - "traefik.http.routers.minio-console.entrypoints=websecure"
+      - "traefik.http.routers.minio-console.tls=true"
+      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+      - "traefik.http.routers.minio-console.service=minio-console"
+      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      retries: 3
+      start_period: 10s
+      timeout: 10s
+
+networks:
+  traefik-2-internet:
+    internal: false
+  traefik-2-minio:
+    internal: true
+  cloudflared-2-internet:
+    internal: false
+  cloudflared-2-traefik:
+    internal: true
+  minio-2-internet:
+    internal: false
+
+volumes:
+  traefik-logs-vol:
+  traefik-acme-vol:
