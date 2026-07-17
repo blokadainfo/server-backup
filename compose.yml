@@ -45,7 +45,8 @@ services:
       - "127.0.0.1:443:443/udp" # WARN: Accessible on localhost only (SSH tunnel)
     networks:
       traefik-2-internet:
-      traefik-2-minio:
+      traefik-2-garage:
+      # traefik-2-minio:
       cloudflared-2-traefik:
     restart: unless-stopped
 
@@ -59,55 +60,66 @@ services:
       cloudflared-2-traefik:
     restart: unless-stopped
 
-  # S3 - TODO: Switch to Garage
-  minio:
-    image: docker.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
-    command: ["server", "/data", "--console-address", ":9001"]
-    environment:
-      MINIO_BROWSER_REDIRECT_URL: "https://${MINIO_CONSOLE_DOMAIN}"
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
-    volumes:
-      - type: bind
-        source: /var/stor/minio/data
-        target: /data
+  # S3
+  garage:
+    image:
     networks:
-      - minio-2-internet
-      - traefik-2-minio
-    labels:
-      - "traefik.enable=true"
-      - "traefik.docker.network=${DOCKER_NETWORK_PREFIX}_traefik-2-minio"
-      - "traefik.http.routers.minio.rule=Host(`${MINIO_S3_DOMAIN}`)"
-      - "traefik.http.routers.minio.entrypoints=websecure"
-      - "traefik.http.routers.minio.tls=true"
-      - "traefik.http.routers.minio.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.minio.service=minio"
-      - "traefik.http.services.minio.loadbalancer.server.port=9000"
-      - "traefik.http.routers.minio-console.rule=Host(`${MINIO_CONSOLE_DOMAIN}`)"
-      - "traefik.http.routers.minio-console.entrypoints=websecure"
-      - "traefik.http.routers.minio-console.tls=true"
-      - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.minio-console.service=minio-console"
-      - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+      - garage-2-internet
+      - traefik-2-garage
     restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-      interval: 30s
-      retries: 3
-      start_period: 10s
-      timeout: 10s
+
+  # minio:
+  #   image: docker.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+  #   command: ["server", "/data", "--console-address", ":9001"]
+  #   environment:
+  #     MINIO_BROWSER_REDIRECT_URL: "https://${MINIO_CONSOLE_DOMAIN}"
+  #     MINIO_ROOT_USER: ${MINIO_ROOT_USER:-admin}
+  #     MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD}
+  #   volumes:
+  #     - type: bind
+  #       source: /var/stor/minio/data
+  #       target: /data
+  #   networks:
+  #     - minio-2-internet
+  #     - traefik-2-minio
+  #   labels:
+  #     - "traefik.enable=true"
+  #     - "traefik.docker.network=${DOCKER_NETWORK_PREFIX}_traefik-2-minio"
+  #     - "traefik.http.routers.minio.rule=Host(`${MINIO_S3_DOMAIN}`)"
+  #     - "traefik.http.routers.minio.entrypoints=websecure"
+  #     - "traefik.http.routers.minio.tls=true"
+  #     - "traefik.http.routers.minio.tls.certresolver=letsencrypt"
+  #     - "traefik.http.routers.minio.service=minio"
+  #     - "traefik.http.services.minio.loadbalancer.server.port=9000"
+  #     - "traefik.http.routers.minio-console.rule=Host(`${MINIO_CONSOLE_DOMAIN}`)"
+  #     - "traefik.http.routers.minio-console.entrypoints=websecure"
+  #     - "traefik.http.routers.minio-console.tls=true"
+  #     - "traefik.http.routers.minio-console.tls.certresolver=letsencrypt"
+  #     - "traefik.http.routers.minio-console.service=minio-console"
+  #     - "traefik.http.services.minio-console.loadbalancer.server.port=9001"
+  #   restart: unless-stopped
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+  #     interval: 30s
+  #     retries: 3
+  #     start_period: 10s
+  #     timeout: 10s
 
 networks:
   traefik-2-internet:
     internal: false
-  traefik-2-minio:
+  traefik-2-garage:
     internal: true
+  # traefik-2-minio:
+  #   internal: true
   cloudflared-2-internet:
     internal: false
   cloudflared-2-traefik:
     internal: true
-  minio-2-internet:
+  garage-2-internet:
     internal: false
+  # minio-2-internet:
+  #   internal: false
 
 volumes:
   traefik-logs-vol:
