@@ -80,7 +80,6 @@ services:
         source: /var/stor/garage/data
         target: /data
     networks:
-      - garage-2-internet
       - traefik-2-garage
     labels:
       - "traefik.enable=true"
@@ -141,8 +140,6 @@ networks:
     internal: false
   cloudflared-2-traefik:
     internal: true
-  garage-2-internet:
-    internal: false
   # minio-2-internet:
   #   internal: false
 
