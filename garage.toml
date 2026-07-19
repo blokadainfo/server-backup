@@ -4,6 +4,7 @@ data_dir = "/mnt/data"
 data_fsync = true
 
 db_engine = "sqlite"
+metadata_auto_snapshot_interval = "6h"
 
 replication_factor = 1
 
