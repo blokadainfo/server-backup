@@ -1,6 +1,6 @@
-metadata_dir = "/metadata"
+metadata_dir = "/mnt/meta"
 metadata_fsync = true
-data_dir = "/data"
+data_dir = "/mnt/data"
 data_fsync = true
 
 db_engine = "sqlite"

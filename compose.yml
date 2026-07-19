@@ -75,10 +75,10 @@ services:
         read_only: true
       - type: bind
         source: /var/stor/garage/metadata
-        target: /metadata
+        target: /mnt/meta
       - type: bind
         source: /var/stor/garage/data
-        target: /data
+        target: /mnt/data
     networks:
       - traefik-2-garage
     labels:
